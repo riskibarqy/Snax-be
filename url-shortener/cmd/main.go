@@ -53,12 +53,18 @@ func main() {
 
 	// Initialize repository
 	urlRepo := postgres.NewURLRepository(db)
+	analyticsRepo := postgres.NewAnalyticsRepository(db)
+	tagRepo := postgres.NewTagRepository(db)
+	customDomainRepo := postgres.NewCustomDomainRepository(db)
 
 	// Initialize service
 	urlService := service.NewURLService(urlRepo)
+	analyticsService := service.NewAnalyticsService(analyticsRepo)
+	tagService := service.NewTagService(tagRepo)
+	customDomainService := service.NewCustomDomainService(customDomainRepo)
 
 	// Initialize handler
-	urlHandler := httphandler.NewURLHandler(urlService)
+	urlHandler := httphandler.NewURLHandler(urlService, analyticsService, tagService, customDomainService)
 
 	// Create router
 	r := chi.NewRouter()
