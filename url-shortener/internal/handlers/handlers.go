@@ -7,9 +7,8 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-
-	"link-shortener/pkg/db"
-	"link-shortener/pkg/middleware"
+	"github.com/riskibarqy/Snax-be/pkg/middleware"
+	"github.com/riskibarqy/Snax-be/url-shortener/internal/db"
 )
 
 type URLHandler struct {

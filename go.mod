@@ -1,4 +1,4 @@
-module link-shortener
+module github.com/riskibarqy/Snax-be
 
 go 1.22.2
 
@@ -43,3 +43,5 @@ require (
 	google.golang.org/grpc v1.62.1 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
 )
+
+replace github.com/riskibarqy/Snax-be => ./

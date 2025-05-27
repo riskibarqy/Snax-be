@@ -14,10 +14,10 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/uptrace/uptrace-go/uptrace"
 
-	"link-shortener/internal/handlers"
-	"link-shortener/pkg/common"
-	"link-shortener/pkg/db"
-	custommiddleware "link-shortener/pkg/middleware"
+	"github.com/riskibarqy/Snax-be/internal/handlers"
+	"github.com/riskibarqy/Snax-be/pkg/common"
+	"github.com/riskibarqy/Snax-be/pkg/db"
+	custommiddleware "github.com/riskibarqy/Snax-be/pkg/middleware"
 )
 
 func main() {
