@@ -7,7 +7,7 @@ import (
 )
 
 // SetupRouter configures and returns the router with all endpoints
-func SetupRouter(h *URLHandler, authMiddleware *customMiddleware.AuthMiddleware) *chi.Mux {
+func SetupRouter(h *Handler, authMiddleware *customMiddleware.AuthMiddleware) *chi.Mux {
 	r := chi.NewRouter()
 
 	// Middleware

@@ -65,7 +65,7 @@ func main() {
 	customDomainService := service.NewCustomDomainService(customDomainRepo)
 
 	// Initialize handler
-	urlHandler := httphandler.NewURLHandler(urlService, analyticsService, tagService, customDomainService)
+	urlHandler := httphandler.NewHandler(urlService, analyticsService, tagService, customDomainService)
 
 	// Create router
 	r := chi.NewRouter()
