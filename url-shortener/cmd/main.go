@@ -2,86 +2,78 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
-	"github.com/uptrace/uptrace-go/uptrace"
-
-	"github.com/riskibarqy/Snax-be/internal/handlers"
-	"github.com/riskibarqy/Snax-be/pkg/common"
-	"github.com/riskibarqy/Snax-be/pkg/db"
-	custommiddleware "github.com/riskibarqy/Snax-be/pkg/middleware"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/jackc/pgx/v5"
+	"github.com/joho/godotenv"
+	httphandler "github.com/riskibarqy/Snax-be/url-shortener/internal/delivery/http"
+	authmiddleware "github.com/riskibarqy/Snax-be/url-shortener/internal/delivery/http/middleware"
+	"github.com/riskibarqy/Snax-be/url-shortener/internal/repository/postgres"
+	"github.com/riskibarqy/Snax-be/url-shortener/internal/service"
 )
 
 func main() {
-	// Load configuration
-	config, err := common.LoadConfig()
-	if err != nil {
-		log.Fatal(err)
+	// Load environment variables
+	if err := godotenv.Load(); err != nil {
+		log.Printf("Warning: .env file not found")
 	}
 
-	// Initialize Uptrace
-	uptrace.ConfigureOpentelemetry(
-		uptrace.WithDSN(config.UptraceDSN),
-		uptrace.WithServiceName(config.ServiceName),
-		uptrace.WithServiceVersion("1.0.0"),
-	)
-	defer uptrace.Shutdown(context.Background())
-
-	// Initialize database connection
-	dbConn, err := db.Connect(config.DatabaseURL)
-	if err != nil {
-		log.Fatal(err)
+	// Get database URL from environment
+	dbURL := os.Getenv("NEON_DATABASE_URL")
+	if dbURL == "" {
+		log.Fatal("NEON_DATABASE_URL environment variable is required")
 	}
-	defer dbConn.Close()
 
-	// Initialize queries
-	queries := db.New(dbConn)
+	// Get Clerk secret key from environment
+	clerkSecretKey := os.Getenv("CLERK_SECRET_KEY")
+	if clerkSecretKey == "" {
+		log.Fatal("CLERK_SECRET_KEY environment variable is required")
+	}
 
-	// Initialize rate limiter with Upstash Redis
-	rateLimiter := custommiddleware.NewRateLimiter(
-		config.RedisURL,
-		config.RedisToken,
-		100,         // 100 requests
-		time.Minute, // per minute
-	)
+	// Initialize auth service
+	authService, err := service.NewAuthService(clerkSecretKey)
+	if err != nil {
+		log.Fatalf("Failed to initialize auth service: %v", err)
+	}
 
 	// Initialize auth middleware
-	authMiddleware, err := custommiddleware.NewAuthMiddleware(config.ClerkSecretKey)
+	authMiddleware := authmiddleware.NewAuthMiddleware(authService)
+
+	// Connect to database
+	ctx := context.Background()
+	db, err := pgx.Connect(ctx, dbURL)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Unable to connect to database: %v", err)
 	}
+	defer db.Close(ctx)
 
-	// Initialize handlers
-	urlHandler := handlers.NewURLHandler(queries)
+	// Initialize repository
+	urlRepo := postgres.NewURLRepository(db)
 
-	// Initialize router
+	// Initialize service
+	urlService := service.NewURLService(urlRepo)
+
+	// Initialize handler
+	urlHandler := httphandler.NewURLHandler(urlService)
+
+	// Create router
 	r := chi.NewRouter()
 
 	// Middleware
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-	r.Use(middleware.RealIP)
-	r.Use(middleware.Timeout(60 * time.Second))
+	r.Use(chimiddleware.Logger)
+	r.Use(chimiddleware.Recoverer)
+	r.Use(chimiddleware.RequestID)
+	r.Use(chimiddleware.RealIP)
 
 	// Public routes
-	r.Group(func(r chi.Router) {
-		r.Use(rateLimiter.RateLimit)
-		r.Use(authMiddleware.OptionalAuth)
-
-		r.Get("/{shortCode}", urlHandler.HandleRedirect)
-	})
+	r.Get("/{shortCode}", urlHandler.HandleRedirect)
 
 	// Protected routes
 	r.Group(func(r chi.Router) {
-		r.Use(rateLimiter.RateLimit)
 		r.Use(authMiddleware.Authenticate)
 
 		r.Post("/shorten", urlHandler.HandleShorten)
@@ -90,27 +82,13 @@ func main() {
 	})
 
 	// Start server
-	server := &http.Server{
-		Addr:    fmt.Sprintf(":%s", config.ServicePort),
-		Handler: r,
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
 	}
 
-	// Graceful shutdown
-	go func() {
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-		<-sigChan
-
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-
-		if err := server.Shutdown(shutdownCtx); err != nil {
-			log.Printf("Error during server shutdown: %v\n", err)
-		}
-	}()
-
-	log.Printf("URL Shortener service starting on port %s\n", config.ServicePort)
-	if err := server.ListenAndServe(); err != http.ErrServerClosed {
+	log.Printf("Server starting on port %s", port)
+	if err := http.ListenAndServe(":"+port, r); err != nil {
 		log.Fatal(err)
 	}
 }

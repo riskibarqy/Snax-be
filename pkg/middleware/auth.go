@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -45,8 +46,11 @@ func (am *AuthMiddleware) Authenticate(next http.Handler) http.Handler {
 
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
+		fmt.Println(tokenString, "==")
+
 		// Verify session token
 		claims, err := am.client.VerifyToken(tokenString)
+		fmt.Println(err, "x=x=x=")
 		if err != nil {
 			http.Error(w, "Invalid token", http.StatusUnauthorized)
 			return

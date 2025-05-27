@@ -1,34 +1,33 @@
 -- name: CreateURL :one
 INSERT INTO urls (
-    original_url,
     short_code,
+    original_url,
     user_id,
     expires_at
 ) VALUES (
     $1, $2, $3, $4
-) RETURNING *;
+)
+RETURNING *;
 
 -- name: GetURLByShortCode :one
 SELECT * FROM urls
-WHERE short_code = $1 AND is_active = true
-AND (expires_at IS NULL OR expires_at > NOW());
+WHERE short_code = $1 AND is_active = true;
 
 -- name: GetURLsByUserID :many
 SELECT * FROM urls
-WHERE user_id = $1
+WHERE user_id = $1 AND is_active = true
 ORDER BY created_at DESC;
+
+-- name: DeactivateURL :exec
+UPDATE urls
+SET is_active = false
+WHERE id = $1 AND user_id = $2;
 
 -- name: IncrementClickCount :one
 UPDATE urls
 SET click_count = click_count + 1
 WHERE id = $1
-RETURNING *;
-
--- name: DeactivateURL :one
-UPDATE urls
-SET is_active = false
-WHERE id = $1 AND user_id = $2
-RETURNING *;
+RETURNING click_count;
 
 -- name: CreateAnalytics :one
 INSERT INTO analytics (
