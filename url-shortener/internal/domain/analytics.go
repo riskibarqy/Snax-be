@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// Analytics represents a URL visit analytics entry
+// Analytics represents a visit to a shortened URL
 type Analytics struct {
 	ID          int64     `json:"id"`
 	URLID       int64     `json:"url_id"`
@@ -17,14 +17,14 @@ type Analytics struct {
 	DeviceType  string    `json:"device_type"`
 }
 
-// AnalyticsRepository defines the interface for analytics data operations
-type AnalyticsRepository interface {
-	Create(ctx context.Context, analytics *Analytics) error
-	GetByURLID(ctx context.Context, urlID int64) ([]Analytics, error)
-}
-
-// AnalyticsService defines the interface for analytics business logic
+// AnalyticsService defines the interface for analytics operations
 type AnalyticsService interface {
 	RecordVisit(ctx context.Context, urlID int64, visitorIP, userAgent, referer string) error
 	GetURLAnalytics(ctx context.Context, urlID int64) ([]Analytics, error)
+}
+
+// AnalyticsRepository defines the interface for analytics storage operations
+type AnalyticsRepository interface {
+	Create(ctx context.Context, analytics *Analytics) error
+	GetByURLID(ctx context.Context, urlID int64) ([]Analytics, error)
 }
