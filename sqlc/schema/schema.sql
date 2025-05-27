@@ -1,5 +1,5 @@
 -- This file is auto-generated from migrations. DO NOT EDIT DIRECTLY.
--- Last updated: Wed, May 28, 2025 12:15:56 AM
+-- Last updated: Wed, May 28, 2025 12:18:11 AM
 
 -- Including migration: 000001_create_urls_table.up.sql
 
