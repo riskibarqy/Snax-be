@@ -5,11 +5,15 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5"
-	"github.com/joho/godotenv"
+	"github.com/riskibarqy/Snax-be/pkg/common"
+	"github.com/riskibarqy/Snax-be/pkg/telemetry"
 	httphandler "github.com/riskibarqy/Snax-be/url-shortener/internal/delivery/http"
 	authmiddleware "github.com/riskibarqy/Snax-be/url-shortener/internal/delivery/http/middleware"
 	"github.com/riskibarqy/Snax-be/url-shortener/internal/repository/postgres"
@@ -17,25 +21,22 @@ import (
 )
 
 func main() {
-	// Load environment variables
-	if err := godotenv.Load(); err != nil {
-		log.Printf("Warning: .env file not found")
+	// Load configuration
+	config, err := common.LoadConfig()
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	// Get database URL from environment
-	dbURL := os.Getenv("NEON_DATABASE_URL")
-	if dbURL == "" {
-		log.Fatal("NEON_DATABASE_URL environment variable is required")
-	}
-
-	// Get Clerk secret key from environment
-	clerkSecretKey := os.Getenv("CLERK_SECRET_KEY")
-	if clerkSecretKey == "" {
-		log.Fatal("CLERK_SECRET_KEY environment variable is required")
+	// Initialize Uptrace
+	if config.UptraceDSN != "" {
+		if err := telemetry.InitUptrace(config.UptraceDSN); err != nil {
+			log.Printf("Failed to initialize Uptrace: %v", err)
+		}
+		defer telemetry.Shutdown(context.Background())
 	}
 
 	// Initialize auth service
-	authService, err := service.NewAuthService(clerkSecretKey)
+	authService, err := service.NewAuthService(config.ClerkSecretKey)
 	if err != nil {
 		log.Fatalf("Failed to initialize auth service: %v", err)
 	}
@@ -45,19 +46,19 @@ func main() {
 
 	// Connect to database
 	ctx := context.Background()
-	db, err := pgx.Connect(ctx, dbURL)
+	db, err := pgx.Connect(ctx, config.DatabaseURL)
 	if err != nil {
 		log.Fatalf("Unable to connect to database: %v", err)
 	}
 	defer db.Close(ctx)
 
-	// Initialize repository
+	// Initialize repositories
 	urlRepo := postgres.NewURLRepository(db)
 	analyticsRepo := postgres.NewAnalyticsRepository(db)
 	tagRepo := postgres.NewTagRepository(db)
 	customDomainRepo := postgres.NewCustomDomainRepository(db)
 
-	// Initialize service
+	// Initialize services
 	urlService := service.NewURLService(urlRepo)
 	analyticsService := service.NewAnalyticsService(analyticsRepo)
 	tagService := service.NewTagService(tagRepo)
@@ -87,15 +88,43 @@ func main() {
 		r.Delete("/urls/{id}", urlHandler.HandleDeleteURL)
 	})
 
-	// Start server
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
+	// Set up graceful shutdown
+	srv := &http.Server{
+		Addr:    ":" + config.ServicePort,
+		Handler: r,
 	}
 
-	log.Printf("Server starting on port %s", port)
-	if err := http.ListenAndServe(":"+port, r); err != nil {
-		log.Fatal(err)
+	// Channel to listen for errors coming from the listener.
+	serverErrors := make(chan error, 1)
+	// Channel to listen for an interrupt or terminate signal from the OS.
+	shutdown := make(chan os.Signal, 1)
+	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
+
+	// Start the service listening for requests.
+	go func() {
+		log.Printf("Server starting on port %s", config.ServicePort)
+		serverErrors <- srv.ListenAndServe()
+	}()
+
+	// Blocking main and waiting for shutdown.
+	select {
+	case err := <-serverErrors:
+		log.Fatalf("Error starting server: %v", err)
+
+	case <-shutdown:
+		log.Println("Starting shutdown")
+
+		// Give outstanding requests a deadline for completion.
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		// Asking listener to shut down and shed load.
+		if err := srv.Shutdown(ctx); err != nil {
+			log.Printf("Graceful shutdown did not complete in %v: %v", 5*time.Second, err)
+			if err := srv.Close(); err != nil {
+				log.Printf("Error killing server: %v", err)
+			}
+		}
 	}
 }
 

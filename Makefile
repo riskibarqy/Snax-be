@@ -1,5 +1,8 @@
 SHELL := /bin/bash
-include .env
+
+# Default to development if ENV is not set
+ENV ?= development
+include .env.$(ENV)
 
 .PHONY: setup sqlc test lint migrate-create migrate-up migrate-down migrate-force sync-schema run-api run-shortener run-analytics run-auth docker-build install-tools
 
@@ -25,16 +28,16 @@ lint:
 
 # Run services
 run-api:
-	SERVICE_NAME=api-gateway go run ./api-gateway/cmd/main.go
+	ENV=$(ENV) SERVICE_NAME=api-gateway go run ./api-gateway/cmd/main.go
 
 run-shortener:
-	SERVICE_NAME=url-shortener go run ./url-shortener/cmd/main.go
+	ENV=$(ENV) SERVICE_NAME=url-shortener go run ./url-shortener/cmd/main.go
 
 run-analytics:
-	SERVICE_NAME=analytics go run ./analytics/cmd/main.go
+	ENV=$(ENV) SERVICE_NAME=analytics go run ./analytics/cmd/main.go
 
 run-auth:
-	SERVICE_NAME=auth go run ./auth/cmd/main.go
+	ENV=$(ENV) SERVICE_NAME=auth go run ./auth/cmd/main.go
 
 # Database migrations
 migrate-create:
