@@ -18,8 +18,8 @@ func NewAnalyticsRepository(db *pgx.Conn) domain.AnalyticsRepository {
 	}
 }
 
-func (r *analyticsRepository) Create(analytics *domain.Analytics) error {
-	err := r.db.QueryRow(context.Background(),
+func (r *analyticsRepository) Create(ctx context.Context, analytics *domain.Analytics) error {
+	err := r.db.QueryRow(ctx,
 		`INSERT INTO analytics (url_id, visitor_ip, user_agent, referer, country_code, device_type)
 		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, timestamp`,
@@ -30,8 +30,8 @@ func (r *analyticsRepository) Create(analytics *domain.Analytics) error {
 	return err
 }
 
-func (r *analyticsRepository) GetByURLID(urlID int64) ([]domain.Analytics, error) {
-	rows, err := r.db.Query(context.Background(),
+func (r *analyticsRepository) GetByURLID(ctx context.Context, urlID int64) ([]domain.Analytics, error) {
+	rows, err := r.db.Query(ctx,
 		`SELECT id, url_id, visitor_ip, user_agent, referer, timestamp, country_code, device_type
 		FROM analytics WHERE url_id = $1 ORDER BY timestamp DESC`,
 		urlID,

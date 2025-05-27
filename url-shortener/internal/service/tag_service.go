@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"strings"
 
 	"github.com/riskibarqy/Snax-be/url-shortener/internal/domain"
@@ -47,28 +48,14 @@ func (s *tagService) GetTagByName(name string) (*domain.Tag, error) {
 	return s.repo.GetByName(strings.ToLower(strings.TrimSpace(name)))
 }
 
-func (s *tagService) GetURLTags(urlID int64) ([]domain.Tag, error) {
-	return s.repo.GetByURLID(urlID)
+func (s *tagService) GetURLTags(ctx context.Context, urlID int64) ([]domain.Tag, error) {
+	return s.repo.GetURLTags(ctx, urlID)
 }
 
-func (s *tagService) AddTagToURL(urlID int64, tagName string) error {
-	// Get or create tag
-	tag, err := s.CreateTag(tagName)
-	if err != nil {
-		return err
-	}
-
-	// Add tag to URL
-	return s.repo.AddURLTag(urlID, tag.ID)
+func (s *tagService) AddTagToURL(ctx context.Context, urlID int64, tag string) error {
+	return s.repo.AddTagToURL(ctx, urlID, tag)
 }
 
-func (s *tagService) RemoveTagFromURL(urlID int64, tagName string) error {
-	// Get tag
-	tag, err := s.GetTagByName(tagName)
-	if err != nil {
-		return err
-	}
-
-	// Remove tag from URL
-	return s.repo.RemoveURLTag(urlID, tag.ID)
+func (s *tagService) RemoveTagFromURL(ctx context.Context, urlID int64, tag string) error {
+	return s.repo.RemoveTagFromURL(ctx, urlID, tag)
 }

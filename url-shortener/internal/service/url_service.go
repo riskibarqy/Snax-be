@@ -1,42 +1,51 @@
 package service
 
 import (
-	"math/rand"
+	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"time"
 
 	"github.com/riskibarqy/Snax-be/url-shortener/internal/domain"
 )
 
 type urlService struct {
-	repo domain.URLRepository
+	urlRepo domain.URLRepository
 }
 
 // NewURLService creates a new URL service
-func NewURLService(repo domain.URLRepository) domain.URLService {
+func NewURLService(urlRepo domain.URLRepository) domain.URLService {
 	return &urlService{
-		repo: repo,
+		urlRepo: urlRepo,
 	}
 }
 
-func (s *urlService) CreateShortURL(originalURL, userID string, expiresAt *time.Time) (*domain.URL, error) {
+// CreateShortURL creates a new shortened URL
+func (s *urlService) CreateShortURL(ctx context.Context, originalURL string, userID string, expiresAt *time.Time) (*domain.URL, error) {
+	shortCode, err := generateShortCode()
+	if err != nil {
+		return nil, err
+	}
+
 	url := &domain.URL{
-		ShortCode:   generateShortCode(),
+		ShortCode:   shortCode,
 		OriginalURL: originalURL,
 		UserID:      userID,
-		ExpiresAt:   expiresAt,
 		CreatedAt:   time.Now(),
+		ExpiresAt:   expiresAt,
 		IsActive:    true,
 	}
 
-	if err := s.repo.Create(url); err != nil {
+	if err := s.urlRepo.Create(url); err != nil {
 		return nil, err
 	}
 
 	return url, nil
 }
 
-func (s *urlService) GetURL(shortCode string) (*domain.URL, error) {
-	url, err := s.repo.GetByShortCode(shortCode)
+// GetURL retrieves a URL by its short code
+func (s *urlService) GetURL(ctx context.Context, shortCode string) (*domain.URL, error) {
+	url, err := s.urlRepo.GetByShortCode(shortCode)
 	if err != nil {
 		return nil, &domain.ErrURLNotFound{ShortCode: shortCode}
 	}
@@ -45,36 +54,34 @@ func (s *urlService) GetURL(shortCode string) (*domain.URL, error) {
 		return nil, &domain.ErrURLNotFound{ShortCode: shortCode}
 	}
 
-	if url.ExpiresAt != nil && time.Now().After(*url.ExpiresAt) {
+	if url.ExpiresAt != nil && url.ExpiresAt.Before(time.Now()) {
 		return nil, &domain.ErrURLExpired{ShortCode: shortCode}
 	}
 
 	return url, nil
 }
 
-func (s *urlService) ListUserURLs(userID string) ([]domain.URL, error) {
-	return s.repo.GetByUserID(userID)
+// ListUserURLs retrieves all URLs for a user
+func (s *urlService) ListUserURLs(ctx context.Context, userID string) ([]domain.URL, error) {
+	return s.urlRepo.GetByUserID(userID)
 }
 
-func (s *urlService) DeleteURL(id int64, userID string) error {
-	return s.repo.Deactivate(id, userID)
+// DeleteURL deletes a URL
+func (s *urlService) DeleteURL(ctx context.Context, id int64, userID string) error {
+	return s.urlRepo.Delete(id, userID)
 }
 
-func (s *urlService) RecordClick(id int64) error {
-	_, err := s.repo.IncrementClickCount(id)
-	return err
+// RecordClick increments the click count for a URL
+func (s *urlService) RecordClick(urlID int64) error {
+	return s.urlRepo.IncrementClickCount(urlID)
 }
 
-// Helper function to generate short code
-func generateShortCode() string {
-	const (
-		charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-		length  = 6
-	)
-
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[rand.Intn(len(charset))]
+// generateShortCode generates a random short code
+func generateShortCode() (string, error) {
+	b := make([]byte, 6)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", err
 	}
-	return string(b)
+	return base64.URLEncoding.EncodeToString(b)[:6], nil
 }

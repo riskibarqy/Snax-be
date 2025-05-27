@@ -1,7 +1,9 @@
 package service
 
 import (
+	"context"
 	"strings"
+	"time"
 
 	"github.com/riskibarqy/Snax-be/url-shortener/internal/domain"
 )
@@ -17,22 +19,22 @@ func NewAnalyticsService(repo domain.AnalyticsRepository) domain.AnalyticsServic
 	}
 }
 
-func (s *analyticsService) RecordVisit(urlID int64, visitorIP, userAgent, referer string) error {
+// RecordVisit records a visit to a URL
+func (s *analyticsService) RecordVisit(ctx context.Context, urlID int64, visitorIP, userAgent, referer string) error {
 	analytics := &domain.Analytics{
-		URLID:      urlID,
-		VisitorIP:  visitorIP,
-		UserAgent:  userAgent,
-		Referer:    referer,
-		DeviceType: detectDeviceType(userAgent),
-		// TODO: Implement country code detection using GeoIP service
-		CountryCode: "UN",
+		URLID:     urlID,
+		VisitorIP: visitorIP,
+		UserAgent: userAgent,
+		Referer:   referer,
+		Timestamp: time.Now(),
 	}
 
-	return s.repo.Create(analytics)
+	return s.repo.Create(ctx, analytics)
 }
 
-func (s *analyticsService) GetURLAnalytics(urlID int64) ([]domain.Analytics, error) {
-	return s.repo.GetByURLID(urlID)
+// GetURLAnalytics retrieves analytics for a URL
+func (s *analyticsService) GetURLAnalytics(ctx context.Context, urlID int64) ([]domain.Analytics, error) {
+	return s.repo.GetByURLID(ctx, urlID)
 }
 
 // Helper function to detect device type from user agent

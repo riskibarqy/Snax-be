@@ -9,6 +9,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/riskibarqy/Snax-be/url-shortener/internal/delivery/http/middleware"
 	internalDomain "github.com/riskibarqy/Snax-be/url-shortener/internal/domain"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 type URLHandler struct {
@@ -45,24 +47,37 @@ type ShortenResponse struct {
 }
 
 func (h *URLHandler) HandleShorten(w http.ResponseWriter, r *http.Request) {
+	ctx, span := otel.Tracer("url-handler").Start(r.Context(), "HandleShorten")
+	defer span.End()
+
 	var req ShortenRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	// Get claims from context
-	claims, ok := r.Context().Value(middleware.ClaimsContextKey).(*internalDomain.Claims)
+	claims, ok := ctx.Value(middleware.ClaimsContextKey).(*internalDomain.Claims)
 	if !ok {
+		span.SetAttributes(attribute.String("error", "unauthorized"))
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	url, err := h.urlService.CreateShortURL(req.URL, claims.Subject, req.ExpiresAt)
+	span.SetAttributes(
+		attribute.String("user_id", claims.Subject),
+		attribute.String("original_url", req.URL),
+	)
+
+	url, err := h.urlService.CreateShortURL(ctx, req.URL, claims.Subject, req.ExpiresAt)
 	if err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
 		http.Error(w, "Failed to create short URL", http.StatusInternalServerError)
 		return
 	}
+
+	span.SetAttributes(attribute.String("short_code", url.ShortCode))
 
 	response := ShortenResponse{
 		ShortCode: url.ShortCode,
@@ -76,10 +91,15 @@ func (h *URLHandler) HandleShorten(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *URLHandler) HandleRedirect(w http.ResponseWriter, r *http.Request) {
-	shortCode := chi.URLParam(r, "shortCode")
+	ctx, span := otel.Tracer("url-handler").Start(r.Context(), "HandleRedirect")
+	defer span.End()
 
-	url, err := h.urlService.GetURL(shortCode)
+	shortCode := chi.URLParam(r, "shortCode")
+	span.SetAttributes(attribute.String("short_code", shortCode))
+
+	url, err := h.urlService.GetURL(ctx, shortCode)
 	if err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
 		switch err.(type) {
 		case *internalDomain.ErrURLNotFound:
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -91,6 +111,11 @@ func (h *URLHandler) HandleRedirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	span.SetAttributes(
+		attribute.String("original_url", url.OriginalURL),
+		attribute.Int64("url_id", url.ID),
+	)
+
 	// Record click asynchronously
 	go h.urlService.RecordClick(url.ID)
 
@@ -98,37 +123,57 @@ func (h *URLHandler) HandleRedirect(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *URLHandler) HandleListURLs(w http.ResponseWriter, r *http.Request) {
-	claims, ok := r.Context().Value(middleware.ClaimsContextKey).(*internalDomain.Claims)
+	ctx, span := otel.Tracer("url-handler").Start(r.Context(), "HandleListURLs")
+	defer span.End()
+
+	claims, ok := ctx.Value(middleware.ClaimsContextKey).(*internalDomain.Claims)
 	if !ok {
+		span.SetAttributes(attribute.String("error", "unauthorized"))
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	urls, err := h.urlService.ListUserURLs(claims.Subject)
+	span.SetAttributes(attribute.String("user_id", claims.Subject))
+
+	urls, err := h.urlService.ListUserURLs(ctx, claims.Subject)
 	if err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
 		http.Error(w, "Failed to fetch URLs", http.StatusInternalServerError)
 		return
 	}
+
+	span.SetAttributes(attribute.Int("url_count", len(urls)))
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(urls)
 }
 
 func (h *URLHandler) HandleDeleteURL(w http.ResponseWriter, r *http.Request) {
-	claims, ok := r.Context().Value(middleware.ClaimsContextKey).(*internalDomain.Claims)
+	ctx, span := otel.Tracer("url-handler").Start(r.Context(), "HandleDeleteURL")
+	defer span.End()
+
+	claims, ok := ctx.Value(middleware.ClaimsContextKey).(*internalDomain.Claims)
 	if !ok {
+		span.SetAttributes(attribute.String("error", "unauthorized"))
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	urlID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
 		http.Error(w, "Invalid URL ID", http.StatusBadRequest)
 		return
 	}
 
-	err = h.urlService.DeleteURL(urlID, claims.Subject)
+	span.SetAttributes(
+		attribute.String("user_id", claims.Subject),
+		attribute.Int64("url_id", urlID),
+	)
+
+	err = h.urlService.DeleteURL(ctx, urlID, claims.Subject)
 	if err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
 		switch err.(type) {
 		case *internalDomain.ErrURLNotFound:
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -143,17 +188,26 @@ func (h *URLHandler) HandleDeleteURL(w http.ResponseWriter, r *http.Request) {
 
 // Analytics handlers
 func (h *URLHandler) HandleGetURLAnalytics(w http.ResponseWriter, r *http.Request) {
+	ctx, span := otel.Tracer("url-handler").Start(r.Context(), "HandleGetURLAnalytics")
+	defer span.End()
+
 	urlID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
 		http.Error(w, "Invalid URL ID", http.StatusBadRequest)
 		return
 	}
 
-	analytics, err := h.analyticsService.GetURLAnalytics(urlID)
+	span.SetAttributes(attribute.Int64("url_id", urlID))
+
+	analytics, err := h.analyticsService.GetURLAnalytics(ctx, urlID)
 	if err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
 		http.Error(w, "Failed to fetch analytics", http.StatusInternalServerError)
 		return
 	}
+
+	span.SetAttributes(attribute.Int("analytics_count", len(analytics)))
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(analytics)
@@ -165,20 +219,31 @@ type AddTagRequest struct {
 }
 
 func (h *URLHandler) HandleAddTag(w http.ResponseWriter, r *http.Request) {
+	ctx, span := otel.Tracer("url-handler").Start(r.Context(), "HandleAddTag")
+	defer span.End()
+
 	urlID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
 		http.Error(w, "Invalid URL ID", http.StatusBadRequest)
 		return
 	}
 
 	var req AddTagRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	err = h.tagService.AddTagToURL(urlID, req.Tag)
+	span.SetAttributes(
+		attribute.Int64("url_id", urlID),
+		attribute.String("tag", req.Tag),
+	)
+
+	err = h.tagService.AddTagToURL(ctx, urlID, req.Tag)
 	if err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
 		http.Error(w, "Failed to add tag", http.StatusInternalServerError)
 		return
 	}
@@ -187,15 +252,25 @@ func (h *URLHandler) HandleAddTag(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *URLHandler) HandleRemoveTag(w http.ResponseWriter, r *http.Request) {
+	ctx, span := otel.Tracer("url-handler").Start(r.Context(), "HandleRemoveTag")
+	defer span.End()
+
 	urlID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
 		http.Error(w, "Invalid URL ID", http.StatusBadRequest)
 		return
 	}
 
 	tagName := chi.URLParam(r, "tag")
-	err = h.tagService.RemoveTagFromURL(urlID, tagName)
+	span.SetAttributes(
+		attribute.Int64("url_id", urlID),
+		attribute.String("tag", tagName),
+	)
+
+	err = h.tagService.RemoveTagFromURL(ctx, urlID, tagName)
 	if err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
 		http.Error(w, "Failed to remove tag", http.StatusInternalServerError)
 		return
 	}
@@ -204,17 +279,26 @@ func (h *URLHandler) HandleRemoveTag(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *URLHandler) HandleGetURLTags(w http.ResponseWriter, r *http.Request) {
+	ctx, span := otel.Tracer("url-handler").Start(r.Context(), "HandleGetURLTags")
+	defer span.End()
+
 	urlID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
 		http.Error(w, "Invalid URL ID", http.StatusBadRequest)
 		return
 	}
 
-	tags, err := h.tagService.GetURLTags(urlID)
+	span.SetAttributes(attribute.Int64("url_id", urlID))
+
+	tags, err := h.tagService.GetURLTags(ctx, urlID)
 	if err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
 		http.Error(w, "Failed to fetch tags", http.StatusInternalServerError)
 		return
 	}
+
+	span.SetAttributes(attribute.Int("tag_count", len(tags)))
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(tags)
@@ -226,20 +310,31 @@ type RegisterDomainRequest struct {
 }
 
 func (h *URLHandler) HandleRegisterDomain(w http.ResponseWriter, r *http.Request) {
-	claims, ok := r.Context().Value(middleware.ClaimsContextKey).(*internalDomain.Claims)
+	ctx, span := otel.Tracer("url-handler").Start(r.Context(), "HandleRegisterDomain")
+	defer span.End()
+
+	claims, ok := ctx.Value(middleware.ClaimsContextKey).(*internalDomain.Claims)
 	if !ok {
+		span.SetAttributes(attribute.String("error", "unauthorized"))
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	var req RegisterDomainRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	domain, err := h.customDomainService.RegisterDomain(req.Domain, claims.Subject)
+	span.SetAttributes(
+		attribute.String("user_id", claims.Subject),
+		attribute.String("domain", req.Domain),
+	)
+
+	domain, err := h.customDomainService.RegisterDomain(ctx, req.Domain, claims.Subject)
 	if err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
 		switch err.(type) {
 		case *internalDomain.ErrDomainNotFound:
 			http.Error(w, err.Error(), http.StatusConflict)
@@ -249,19 +344,28 @@ func (h *URLHandler) HandleRegisterDomain(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	span.SetAttributes(attribute.Int64("domain_id", domain.ID))
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(domain)
 }
 
 func (h *URLHandler) HandleVerifyDomain(w http.ResponseWriter, r *http.Request) {
+	ctx, span := otel.Tracer("url-handler").Start(r.Context(), "HandleVerifyDomain")
+	defer span.End()
+
 	domainID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
 		http.Error(w, "Invalid domain ID", http.StatusBadRequest)
 		return
 	}
 
-	err = h.customDomainService.VerifyDomain(domainID)
+	span.SetAttributes(attribute.Int64("domain_id", domainID))
+
+	err = h.customDomainService.VerifyDomain(ctx, domainID)
 	if err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
 		switch err.(type) {
 		case *internalDomain.ErrDomainNotFound:
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -275,37 +379,57 @@ func (h *URLHandler) HandleVerifyDomain(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *URLHandler) HandleListUserDomains(w http.ResponseWriter, r *http.Request) {
-	claims, ok := r.Context().Value(middleware.ClaimsContextKey).(*internalDomain.Claims)
+	ctx, span := otel.Tracer("url-handler").Start(r.Context(), "HandleListUserDomains")
+	defer span.End()
+
+	claims, ok := ctx.Value(middleware.ClaimsContextKey).(*internalDomain.Claims)
 	if !ok {
+		span.SetAttributes(attribute.String("error", "unauthorized"))
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	domains, err := h.customDomainService.GetUserDomains(claims.Subject)
+	span.SetAttributes(attribute.String("user_id", claims.Subject))
+
+	domains, err := h.customDomainService.GetUserDomains(ctx, claims.Subject)
 	if err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
 		http.Error(w, "Failed to fetch domains", http.StatusInternalServerError)
 		return
 	}
+
+	span.SetAttributes(attribute.Int("domain_count", len(domains)))
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(domains)
 }
 
 func (h *URLHandler) HandleDeleteDomain(w http.ResponseWriter, r *http.Request) {
-	claims, ok := r.Context().Value(middleware.ClaimsContextKey).(*internalDomain.Claims)
+	ctx, span := otel.Tracer("url-handler").Start(r.Context(), "HandleDeleteDomain")
+	defer span.End()
+
+	claims, ok := ctx.Value(middleware.ClaimsContextKey).(*internalDomain.Claims)
 	if !ok {
+		span.SetAttributes(attribute.String("error", "unauthorized"))
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	domainID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
 		http.Error(w, "Invalid domain ID", http.StatusBadRequest)
 		return
 	}
 
-	err = h.customDomainService.DeleteDomain(domainID, claims.Subject)
+	span.SetAttributes(
+		attribute.String("user_id", claims.Subject),
+		attribute.Int64("domain_id", domainID),
+	)
+
+	err = h.customDomainService.DeleteDomain(ctx, domainID, claims.Subject)
 	if err != nil {
+		span.SetAttributes(attribute.String("error", err.Error()))
 		switch err.(type) {
 		case *internalDomain.ErrDomainNotFound:
 			http.Error(w, err.Error(), http.StatusNotFound)

@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // Analytics represents a URL visit analytics entry
 type Analytics struct {
@@ -16,12 +19,12 @@ type Analytics struct {
 
 // AnalyticsRepository defines the interface for analytics data operations
 type AnalyticsRepository interface {
-	Create(analytics *Analytics) error
-	GetByURLID(urlID int64) ([]Analytics, error)
+	Create(ctx context.Context, analytics *Analytics) error
+	GetByURLID(ctx context.Context, urlID int64) ([]Analytics, error)
 }
 
 // AnalyticsService defines the interface for analytics business logic
 type AnalyticsService interface {
-	RecordVisit(urlID int64, visitorIP, userAgent, referer string) error
-	GetURLAnalytics(urlID int64) ([]Analytics, error)
+	RecordVisit(ctx context.Context, urlID int64, visitorIP, userAgent, referer string) error
+	GetURLAnalytics(ctx context.Context, urlID int64) ([]Analytics, error)
 }

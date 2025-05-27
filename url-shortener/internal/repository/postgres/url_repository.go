@@ -70,7 +70,7 @@ func (r *urlRepository) GetByUserID(userID string) ([]domain.URL, error) {
 	return urls, nil
 }
 
-func (r *urlRepository) Deactivate(id int64, userID string) error {
+func (r *urlRepository) Delete(id int64, userID string) error {
 	result, err := r.db.Exec(context.Background(),
 		`UPDATE urls SET is_active = false WHERE id = $1 AND user_id = $2`,
 		id, userID,
@@ -86,12 +86,10 @@ func (r *urlRepository) Deactivate(id int64, userID string) error {
 	return nil
 }
 
-func (r *urlRepository) IncrementClickCount(id int64) (int64, error) {
-	var newCount int64
-	err := r.db.QueryRow(context.Background(),
-		`UPDATE urls SET click_count = click_count + 1 WHERE id = $1 RETURNING click_count`,
+func (r *urlRepository) IncrementClickCount(id int64) error {
+	_, err := r.db.Exec(context.Background(),
+		`UPDATE urls SET click_count = click_count + 1 WHERE id = $1`,
 		id,
-	).Scan(&newCount)
-
-	return newCount, err
+	)
+	return err
 }

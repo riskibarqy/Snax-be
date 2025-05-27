@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // CustomDomain represents a custom domain for URL shortening
 type CustomDomain struct {
@@ -13,19 +16,20 @@ type CustomDomain struct {
 
 // CustomDomainRepository defines the interface for custom domain data operations
 type CustomDomainRepository interface {
-	Create(domain *CustomDomain) error
-	GetByDomain(domain string) (*CustomDomain, error)
-	GetByUserID(userID string) ([]CustomDomain, error)
-	UpdateVerificationStatus(id int64, verified bool) error
-	Delete(id int64, userID string) error
+	Create(ctx context.Context, domain *CustomDomain) error
+	GetByID(ctx context.Context, id int64) (*CustomDomain, error)
+	GetByDomain(ctx context.Context, domain string) (*CustomDomain, error)
+	GetByUserID(ctx context.Context, userID string) ([]CustomDomain, error)
+	Delete(ctx context.Context, id int64, userID string) error
+	VerifyDomain(ctx context.Context, id int64) error
 }
 
 // CustomDomainService defines the interface for custom domain business logic
 type CustomDomainService interface {
-	RegisterDomain(domain, userID string) (*CustomDomain, error)
-	VerifyDomain(id int64) error
-	GetUserDomains(userID string) ([]CustomDomain, error)
-	DeleteDomain(id int64, userID string) error
+	RegisterDomain(ctx context.Context, domain string, userID string) (*CustomDomain, error)
+	GetUserDomains(ctx context.Context, userID string) ([]CustomDomain, error)
+	DeleteDomain(ctx context.Context, id int64, userID string) error
+	VerifyDomain(ctx context.Context, id int64) error
 }
 
 // ErrDomainNotFound is returned when a custom domain is not found

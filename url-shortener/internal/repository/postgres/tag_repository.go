@@ -96,3 +96,33 @@ func (r *tagRepository) RemoveURLTag(urlID, tagID int64) error {
 	)
 	return err
 }
+
+func (r *tagRepository) AddTagToURL(ctx context.Context, urlID int64, tagName string) error {
+	// First get or create the tag
+	tag, err := r.GetByName(tagName)
+	if err != nil {
+		// Create new tag if it doesn't exist
+		tag = &domain.Tag{Name: tagName}
+		if err := r.Create(tag); err != nil {
+			return err
+		}
+	}
+
+	// Add the tag to URL
+	return r.AddURLTag(urlID, tag.ID)
+}
+
+func (r *tagRepository) RemoveTagFromURL(ctx context.Context, urlID int64, tagName string) error {
+	// Get the tag
+	tag, err := r.GetByName(tagName)
+	if err != nil {
+		return err
+	}
+
+	// Remove the tag from URL
+	return r.RemoveURLTag(urlID, tag.ID)
+}
+
+func (r *tagRepository) GetURLTags(ctx context.Context, urlID int64) ([]domain.Tag, error) {
+	return r.GetByURLID(urlID)
+}

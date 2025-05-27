@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -18,12 +19,12 @@ func NewCustomDomainService(repo internalDomain.CustomDomainRepository) internal
 	}
 }
 
-func (s *customDomainService) RegisterDomain(domain, userID string) (*internalDomain.CustomDomain, error) {
+func (s *customDomainService) RegisterDomain(ctx context.Context, domain, userID string) (*internalDomain.CustomDomain, error) {
 	// Normalize domain
 	domain = strings.ToLower(strings.TrimSpace(domain))
 
 	// Check if domain already exists
-	if _, err := s.repo.GetByDomain(domain); err == nil {
+	if _, err := s.repo.GetByDomain(ctx, domain); err == nil {
 		return nil, &internalDomain.ErrDomainNotFound{Domain: domain}
 	}
 
@@ -35,7 +36,7 @@ func (s *customDomainService) RegisterDomain(domain, userID string) (*internalDo
 		CreatedAt: time.Now(),
 	}
 
-	err := s.repo.Create(d)
+	err := s.repo.Create(ctx, d)
 	if err != nil {
 		return nil, err
 	}
@@ -43,14 +44,14 @@ func (s *customDomainService) RegisterDomain(domain, userID string) (*internalDo
 	return d, nil
 }
 
-func (s *customDomainService) VerifyDomain(id int64) error {
-	return s.repo.UpdateVerificationStatus(id, true)
+func (s *customDomainService) VerifyDomain(ctx context.Context, id int64) error {
+	return s.repo.VerifyDomain(ctx, id)
 }
 
-func (s *customDomainService) GetUserDomains(userID string) ([]internalDomain.CustomDomain, error) {
-	return s.repo.GetByUserID(userID)
+func (s *customDomainService) GetUserDomains(ctx context.Context, userID string) ([]internalDomain.CustomDomain, error) {
+	return s.repo.GetByUserID(ctx, userID)
 }
 
-func (s *customDomainService) DeleteDomain(id int64, userID string) error {
-	return s.repo.Delete(id, userID)
+func (s *customDomainService) DeleteDomain(ctx context.Context, id int64, userID string) error {
+	return s.repo.Delete(ctx, id, userID)
 }
