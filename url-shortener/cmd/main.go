@@ -10,41 +10,50 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/riskibarqy/Snax-be/pkg/common"
-	"github.com/riskibarqy/Snax-be/pkg/telemetry"
+	"github.com/riskibarqy/Snax-be/url-shortener/internal/config"
 	httphandler "github.com/riskibarqy/Snax-be/url-shortener/internal/delivery/http"
 	authmiddleware "github.com/riskibarqy/Snax-be/url-shortener/internal/delivery/http/middleware"
 	"github.com/riskibarqy/Snax-be/url-shortener/internal/repository/postgres"
 	"github.com/riskibarqy/Snax-be/url-shortener/internal/service"
+	"github.com/riskibarqy/Snax-be/url-shortener/internal/telemetry"
 )
 
 func main() {
 	// Load configuration
-	config, err := common.LoadConfig()
+	appConfig, err := config.LoadConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Initialize Uptrace
-	if config.UptraceDSN != "" {
-		if err := telemetry.InitUptrace(config.UptraceDSN); err != nil {
+	if appConfig.UptraceDSN != "" {
+		if err := telemetry.InitUptrace(appConfig.UptraceDSN); err != nil {
 			log.Printf("Failed to initialize Uptrace: %v", err)
 		}
 		defer telemetry.Shutdown(context.Background())
 	}
 
-	// Initialize auth service
-	authService, err := service.NewAuthService(config.ClerkSecretKey)
-	if err != nil {
-		log.Fatalf("Failed to initialize auth service: %v", err)
+	// Initialize Redis
+	if err := config.InitRedis(appConfig.RedisURL, appConfig.RedisToken); err != nil {
+		log.Fatalf("Failed to initialize Redis: %v", err)
 	}
+	defer config.CloseRedis()
+
+	// // Initialize auth service
+	// authService, err := service.NewAuthService(appConfig.ClerkSecretKey)
+	// if err != nil {
+	// 	log.Fatalf("Failed to initialize auth service: %v", err)
+	// }
 
 	// Initialize auth middleware
-	authMiddleware := authmiddleware.NewAuthMiddleware(authService)
+	authMiddleware, err := authmiddleware.NewAuthMiddleware(appConfig.ClerkSecretKey)
+	if err != nil {
+		log.Fatalf("Failed to initialize auth middleware: %v", err)
+	}
 
 	// Connect to database
 	ctx := context.Background()
-	db, err := pgx.Connect(ctx, config.DatabaseURL)
+	db, err := pgx.Connect(ctx, appConfig.DatabaseURL)
 	if err != nil {
 		log.Fatalf("Unable to connect to database: %v", err)
 	}
@@ -70,7 +79,7 @@ func main() {
 
 	// Set up graceful shutdown
 	srv := &http.Server{
-		Addr:    ":" + config.ServicePort,
+		Addr:    ":" + appConfig.ServicePort,
 		Handler: router,
 	}
 
@@ -82,7 +91,7 @@ func main() {
 
 	// Start the service listening for requests.
 	go func() {
-		log.Printf("Server starting on port %s", config.ServicePort)
+		log.Printf("Server starting on port %s", appConfig.ServicePort)
 		serverErrors <- srv.ListenAndServe()
 	}()
 

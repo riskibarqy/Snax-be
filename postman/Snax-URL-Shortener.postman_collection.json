@@ -1,0 +1,364 @@
+{
+	"info": {
+		"_postman_id": "1234-5678-abcd-efgh",
+		"name": "Snax URL Shortener",
+		"description": "API collection for Snax URL Shortener service",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "System",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health",
+							"host": ["{{base_url}}"],
+							"path": ["health"]
+						},
+						"description": "Check if the service is running"
+					}
+				}
+			]
+		},
+		{
+			"name": "Public",
+			"item": [
+				{
+					"name": "Create Short URL (Public)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"url\": \"https://example.com/long-url\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/public/shorten",
+							"host": ["{{base_url}}"],
+							"path": ["public", "shorten"]
+						},
+						"description": "Create a short URL without authentication (rate limited to 20 req/sec)"
+					}
+				},
+				{
+					"name": "Redirect to URL",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/public/r/{{shortCode}}",
+							"host": ["{{base_url}}"],
+							"path": ["public", "r", "{{shortCode}}"]
+						},
+						"description": "Redirect to the original URL using short code"
+					}
+				},
+				{
+					"name": "Public Metrics",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/public/metrics",
+							"host": ["{{base_url}}"],
+							"path": ["public", "metrics"]
+						},
+						"description": "Get public metrics"
+					}
+				}
+			]
+		},
+		{
+			"name": "Private - URLs",
+			"item": [
+				{
+					"name": "Create Short URL",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"url\": \"https://example.com/long-url\",\n    \"customAlias\": \"my-custom-alias\",\n    \"tags\": [\"example\", \"demo\"]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/private/urls",
+							"host": ["{{base_url}}"],
+							"path": ["private", "urls"]
+						},
+						"description": "Create a new short URL"
+					}
+				},
+				{
+					"name": "List URLs",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/private/urls",
+							"host": ["{{base_url}}"],
+							"path": ["private", "urls"]
+						},
+						"description": "List all URLs for the authenticated user"
+					}
+				},
+				{
+					"name": "Delete URL",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/private/urls/{{url_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["private", "urls", "{{url_id}}"]
+						},
+						"description": "Delete a URL by ID"
+					}
+				},
+				{
+					"name": "Get URL Analytics",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/private/urls/{{url_id}}/analytics",
+							"host": ["{{base_url}}"],
+							"path": ["private", "urls", "{{url_id}}", "analytics"]
+						},
+						"description": "Get analytics for a specific URL"
+					}
+				}
+			]
+		},
+		{
+			"name": "Private - Tags",
+			"item": [
+				{
+					"name": "Get URL Tags",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/private/urls/{{url_id}}/tags",
+							"host": ["{{base_url}}"],
+							"path": ["private", "urls", "{{url_id}}", "tags"]
+						},
+						"description": "Get all tags for a URL"
+					}
+				},
+				{
+					"name": "Add Tag",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tag\": \"example-tag\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/private/urls/{{url_id}}/tags",
+							"host": ["{{base_url}}"],
+							"path": ["private", "urls", "{{url_id}}", "tags"]
+						},
+						"description": "Add a tag to a URL"
+					}
+				},
+				{
+					"name": "Remove Tag",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/private/urls/{{url_id}}/tags/{{tag}}",
+							"host": ["{{base_url}}"],
+							"path": ["private", "urls", "{{url_id}}", "tags", "{{tag}}"]
+						},
+						"description": "Remove a tag from a URL"
+					}
+				}
+			]
+		},
+		{
+			"name": "Private - Domains",
+			"item": [
+				{
+					"name": "List Domains",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/private/domains",
+							"host": ["{{base_url}}"],
+							"path": ["private", "domains"]
+						},
+						"description": "List all custom domains"
+					}
+				},
+				{
+					"name": "Register Domain",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"domain\": \"example.com\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/private/domains",
+							"host": ["{{base_url}}"],
+							"path": ["private", "domains"]
+						},
+						"description": "Register a new custom domain"
+					}
+				},
+				{
+					"name": "Verify Domain",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/private/domains/{{domain_id}}/verify",
+							"host": ["{{base_url}}"],
+							"path": ["private", "domains", "{{domain_id}}", "verify"]
+						},
+						"description": "Verify domain ownership"
+					}
+				},
+				{
+					"name": "Delete Domain",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/private/domains/{{domain_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["private", "domains", "{{domain_id}}"]
+						},
+						"description": "Delete a custom domain"
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8080",
+			"type": "string",
+			"description": "Base URL of the API"
+		},
+		{
+			"key": "jwt_token",
+			"value": "your-jwt-token",
+			"type": "string",
+			"description": "JWT token for authentication"
+		},
+		{
+			"key": "url_id",
+			"value": "123",
+			"type": "string",
+			"description": "URL ID for operations"
+		},
+		{
+			"key": "shortCode",
+			"value": "abc123",
+			"type": "string",
+			"description": "Short code for URL redirection"
+		},
+		{
+			"key": "domain_id",
+			"value": "456",
+			"type": "string",
+			"description": "Domain ID for operations"
+		}
+	]
+} 

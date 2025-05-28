@@ -12,11 +12,14 @@ import (
 func SetupRouter(h *Handler, authMiddleware *customMiddleware.AuthMiddleware) *chi.Mux {
 	r := chi.NewRouter()
 
-	// Middleware
+	// Global middleware
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
+
+	// Create rate limiter
+	rateLimiter := customMiddleware.NewRateLimiter()
 
 	// Health check endpoint
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -24,31 +27,50 @@ func SetupRouter(h *Handler, authMiddleware *customMiddleware.AuthMiddleware) *c
 		w.Write([]byte("OK"))
 	})
 
-	// Public routes
-	r.Get("/{shortCode}", h.HandleRedirect)
+	// Public routes (/public/...)
+	r.Route("/public", func(r chi.Router) {
+		// Apply rate limiting to public shortening endpoint
+		r.With(rateLimiter.RateLimit).Post("/shorten", h.HandlePublicShorten)
 
-	// Protected routes
-	r.Group(func(r chi.Router) {
+		// URL shortener redirect endpoint (no rate limit)
+		r.Get("/r/{shortCode}", h.HandleRedirect)
+
+		// Public metrics endpoint (if needed)
+		r.Get("/metrics", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("Public Metrics"))
+		})
+	})
+
+	// Private routes (/private/...)
+	r.Route("/private", func(r chi.Router) {
+		// Apply authentication middleware to all private routes
 		r.Use(authMiddleware.Authenticate)
 
-		// URL routes
-		r.Post("/api/urls", h.HandleShorten)
-		r.Get("/api/urls", h.HandleListURLs)
-		r.Delete("/api/urls/{id}", h.HandleDeleteURL)
+		// Apply rate limiting to private URL creation
+		r.Route("/urls", func(r chi.Router) {
+			r.With(rateLimiter.RateLimit).Post("/", h.HandleShorten)
+			r.Get("/", h.HandleListURLs)
+			r.Delete("/{id}", h.HandleDeleteURL)
 
-		// Analytics routes
-		r.Get("/api/urls/{id}/analytics", h.HandleGetURLAnalytics)
+			// URL Analytics
+			r.Get("/{id}/analytics", h.HandleGetURLAnalytics)
 
-		// Tag routes
-		r.Get("/api/urls/{id}/tags", h.HandleGetURLTags)
-		r.Post("/api/urls/{id}/tags", h.HandleAddTag)
-		r.Delete("/api/urls/{id}/tags/{tag}", h.HandleRemoveTag)
+			// URL Tags
+			r.Route("/{id}/tags", func(r chi.Router) {
+				r.Get("/", h.HandleGetURLTags)
+				r.Post("/", h.HandleAddTag)
+				r.Delete("/{tag}", h.HandleRemoveTag)
+			})
+		})
 
-		// Custom domain routes
-		r.Get("/api/domains", h.HandleListUserDomains)
-		r.Post("/api/domains", h.HandleRegisterDomain)
-		r.Post("/api/domains/{id}/verify", h.HandleVerifyDomain)
-		r.Delete("/api/domains/{id}", h.HandleDeleteDomain)
+		// Domain Management
+		r.Route("/domains", func(r chi.Router) {
+			r.Get("/", h.HandleListUserDomains)
+			r.Post("/", h.HandleRegisterDomain)
+			r.Post("/{id}/verify", h.HandleVerifyDomain)
+			r.Delete("/{id}", h.HandleDeleteDomain)
+		})
 	})
 
 	return r

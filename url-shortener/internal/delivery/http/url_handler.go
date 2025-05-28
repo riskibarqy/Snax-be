@@ -24,7 +24,7 @@ func (h *Handler) HandleShorten(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	claims, ok := ctx.Value(middleware.ClaimsContextKey).(*internalDomain.Claims)
+	claims, ok := ctx.Value(middleware.SessionContextKey).(*internalDomain.Claims)
 	if !ok {
 		span.SetAttributes(attribute.String("error", "unauthorized"))
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -94,7 +94,7 @@ func (h *Handler) HandleListURLs(w http.ResponseWriter, r *http.Request) {
 	ctx, span := otel.Tracer("url-handler").Start(r.Context(), "HandleListURLs")
 	defer span.End()
 
-	claims, ok := ctx.Value(middleware.ClaimsContextKey).(*internalDomain.Claims)
+	claims, ok := ctx.Value(middleware.SessionContextKey).(*internalDomain.Claims)
 	if !ok {
 		span.SetAttributes(attribute.String("error", "unauthorized"))
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -121,7 +121,7 @@ func (h *Handler) HandleDeleteURL(w http.ResponseWriter, r *http.Request) {
 	ctx, span := otel.Tracer("url-handler").Start(r.Context(), "HandleDeleteURL")
 	defer span.End()
 
-	claims, ok := ctx.Value(middleware.ClaimsContextKey).(*internalDomain.Claims)
+	claims, ok := ctx.Value(middleware.SessionContextKey).(*internalDomain.Claims)
 	if !ok {
 		span.SetAttributes(attribute.String("error", "unauthorized"))
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)

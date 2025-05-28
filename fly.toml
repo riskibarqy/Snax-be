@@ -18,6 +18,7 @@ primary_region = "sin"
 # Add your sensitive environment variables using `fly secrets set`:
 # fly secrets set NEON_DATABASE_URL="your-database-url"
 # fly secrets set CLERK_SECRET_KEY="your-clerk-key"
+# fly secrets set REDIS_URL="your-redis-url"
 # etc...
 
 [http_service]

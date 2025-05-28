@@ -1,4 +1,4 @@
-package common
+package config
 
 import (
 	"fmt"
@@ -14,12 +14,6 @@ type Config struct {
 	// Redis
 	RedisURL   string
 	RedisToken string
-
-	// QStash
-	QStashToken          string
-	QStashSigningKey     string
-	QStashNextSigningKey string
-	QStashEndpoint       string
 
 	// Clerk
 	ClerkSecretKey string
@@ -50,12 +44,6 @@ func LoadConfig() (*Config, error) {
 		// Redis
 		RedisURL:   os.Getenv("UPSTASH_REDIS_URL"),
 		RedisToken: os.Getenv("UPSTASH_REDIS_TOKEN"),
-
-		// QStash
-		QStashToken:          os.Getenv("QSTASH_TOKEN"),
-		QStashSigningKey:     os.Getenv("QSTASH_SIGNING_KEY"),
-		QStashNextSigningKey: os.Getenv("QSTASH_NEXT_SIGNING_KEY"),
-		QStashEndpoint:       os.Getenv("QSTASH_ENDPOINT"),
 
 		// Clerk
 		ClerkSecretKey: os.Getenv("CLERK_SECRET_KEY"),

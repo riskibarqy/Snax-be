@@ -17,7 +17,7 @@ func (h *Handler) HandleRegisterDomain(w http.ResponseWriter, r *http.Request) {
 	ctx, span := otel.Tracer("url-handler").Start(r.Context(), "HandleRegisterDomain")
 	defer span.End()
 
-	claims, ok := ctx.Value(middleware.ClaimsContextKey).(*internalDomain.Claims)
+	claims, ok := ctx.Value(middleware.SessionContextKey).(*internalDomain.Claims)
 	if !ok {
 		span.SetAttributes(attribute.String("error", "unauthorized"))
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -88,7 +88,7 @@ func (h *Handler) HandleListUserDomains(w http.ResponseWriter, r *http.Request) 
 	ctx, span := otel.Tracer("url-handler").Start(r.Context(), "HandleListUserDomains")
 	defer span.End()
 
-	claims, ok := ctx.Value(middleware.ClaimsContextKey).(*internalDomain.Claims)
+	claims, ok := ctx.Value(middleware.SessionContextKey).(*internalDomain.Claims)
 	if !ok {
 		span.SetAttributes(attribute.String("error", "unauthorized"))
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -115,7 +115,7 @@ func (h *Handler) HandleDeleteDomain(w http.ResponseWriter, r *http.Request) {
 	ctx, span := otel.Tracer("url-handler").Start(r.Context(), "HandleDeleteDomain")
 	defer span.End()
 
-	claims, ok := ctx.Value(middleware.ClaimsContextKey).(*internalDomain.Claims)
+	claims, ok := ctx.Value(middleware.SessionContextKey).(*internalDomain.Claims)
 	if !ok {
 		span.SetAttributes(attribute.String("error", "unauthorized"))
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
