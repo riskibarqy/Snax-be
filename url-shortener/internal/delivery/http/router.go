@@ -1,6 +1,8 @@
 package http
 
 import (
+	"net/http"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	customMiddleware "github.com/riskibarqy/Snax-be/url-shortener/internal/delivery/http/middleware"
@@ -15,6 +17,12 @@ func SetupRouter(h *Handler, authMiddleware *customMiddleware.AuthMiddleware) *c
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
+
+	// Health check endpoint
+	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
 
 	// Public routes
 	r.Get("/{shortCode}", h.HandleRedirect)

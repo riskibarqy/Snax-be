@@ -1,12 +1,12 @@
-app = "link-shortener"
-primary_region = "lax"
+app = "snax-url-shortener"
+primary_region = "sin"  # Singapore region, change as needed
 
 [build]
   dockerfile = "url-shortener/Dockerfile"
 
 [env]
-  SERVICE_NAME = "url-shortener"
   PORT = "8080"
+  ENV = "production"
 
 [http_service]
   internal_port = 8080
@@ -15,6 +15,17 @@ primary_region = "lax"
   auto_start_machines = true
   min_machines_running = 1
   processes = ["app"]
+
+[[http_service.checks]]
+  grace_period = "30s"
+  interval = "15s"
+  method = "GET"
+  timeout = "10s"
+  path = "/health"
+
+[metrics]
+  port = 8080
+  path = "/metrics"
 
 [[services]]
   protocol = "tcp"
