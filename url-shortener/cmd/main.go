@@ -9,8 +9,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5"
 	"github.com/riskibarqy/Snax-be/pkg/common"
 	"github.com/riskibarqy/Snax-be/pkg/telemetry"
@@ -65,33 +63,15 @@ func main() {
 	customDomainService := service.NewCustomDomainService(customDomainRepo)
 
 	// Initialize handler
-	urlHandler := httphandler.NewHandler(urlService, analyticsService, tagService, customDomainService)
+	handler := httphandler.NewHandler(urlService, analyticsService, tagService, customDomainService)
 
-	// Create router
-	r := chi.NewRouter()
-
-	// Middleware
-	r.Use(chimiddleware.Logger)
-	r.Use(chimiddleware.Recoverer)
-	r.Use(chimiddleware.RequestID)
-	r.Use(chimiddleware.RealIP)
-
-	// Public routes
-	r.Get("/{shortCode}", urlHandler.HandleRedirect)
-
-	// Protected routes
-	r.Group(func(r chi.Router) {
-		r.Use(authMiddleware.Authenticate)
-
-		r.Post("/shorten", urlHandler.HandleShorten)
-		r.Get("/urls", urlHandler.HandleListURLs)
-		r.Delete("/urls/{id}", urlHandler.HandleDeleteURL)
-	})
+	// Setup router using the router.go configuration
+	router := httphandler.SetupRouter(handler, authMiddleware)
 
 	// Set up graceful shutdown
 	srv := &http.Server{
 		Addr:    ":" + config.ServicePort,
-		Handler: r,
+		Handler: router,
 	}
 
 	// Channel to listen for errors coming from the listener.
