@@ -1,6 +1,7 @@
 package common
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -32,8 +33,17 @@ type Config struct {
 }
 
 func LoadConfig() (*Config, error) {
-	// Load .env file if it exists
-	godotenv.Load()
+	// Get environment
+	env := os.Getenv("ENV")
+	if env == "" {
+		env = "development"
+	}
+
+	// Load environment file
+	envFile := fmt.Sprintf(".env.%s", env)
+	if err := godotenv.Load(envFile); err != nil {
+		return nil, fmt.Errorf("error loading %s: %v", envFile, err)
+	}
 
 	config := &Config{
 		// Database
