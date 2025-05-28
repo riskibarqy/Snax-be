@@ -1,0 +1,6 @@
+# flyctl launch added from .gitignore
+**\.env
+**\.env.local
+**\.env.development
+**\.env.production
+fly.toml

@@ -1,12 +1,24 @@
+# fly.toml app configuration file generated for snax-url-shortener on 2025-05-28T16:05:11+07:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
 app = "snax-url-shortener"
-primary_region = "sin"  # Singapore region, change as needed
+primary_region = "sin"
 
 [build]
   dockerfile = "url-shortener/Dockerfile"
+  context = "."
 
 [env]
-  PORT = "8080"
   ENV = "production"
+  PORT = "8080"
+  SERVICE_NAME = "url-shortener"
+
+# Add your sensitive environment variables using `fly secrets set`:
+# fly secrets set NEON_DATABASE_URL="your-database-url"
+# fly secrets set CLERK_SECRET_KEY="your-clerk-key"
+# etc...
 
 [http_service]
   internal_port = 8080
@@ -23,10 +35,6 @@ primary_region = "sin"  # Singapore region, change as needed
   timeout = "10s"
   path = "/health"
 
-[metrics]
-  port = 8080
-  path = "/metrics"
-
 [[services]]
   protocol = "tcp"
   internal_port = 8080
@@ -34,6 +42,7 @@ primary_region = "sin"  # Singapore region, change as needed
   [[services.ports]]
     port = 80
     handlers = ["http"]
+
   [[services.ports]]
     port = 443
     handlers = ["tls", "http"]
@@ -46,4 +55,13 @@ primary_region = "sin"  # Singapore region, change as needed
   [[services.tcp_checks]]
     interval = "15s"
     timeout = "2s"
-    grace_period = "1s" 
+    grace_period = "1s"
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
+
+[[metrics]]
+  port = 8080
+  path = "/metrics"

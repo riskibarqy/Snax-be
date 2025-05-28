@@ -39,11 +39,9 @@ func LoadConfig() (*Config, error) {
 		env = "development"
 	}
 
-	// Load environment file
+	// Try to load environment file, but don't fail if it doesn't exist
 	envFile := fmt.Sprintf(".env.%s", env)
-	if err := godotenv.Load(envFile); err != nil {
-		return nil, fmt.Errorf("error loading %s: %v", envFile, err)
-	}
+	_ = godotenv.Load(envFile)
 
 	config := &Config{
 		// Database
@@ -73,6 +71,15 @@ func LoadConfig() (*Config, error) {
 	// Set default port if not specified
 	if config.ServicePort == "" {
 		config.ServicePort = "8080"
+	}
+
+	// Validate required configurations
+	if config.DatabaseURL == "" {
+		return nil, fmt.Errorf("NEON_DATABASE_URL is required")
+	}
+
+	if config.ClerkSecretKey == "" {
+		return nil, fmt.Errorf("CLERK_SECRET_KEY is required")
 	}
 
 	return config, nil
