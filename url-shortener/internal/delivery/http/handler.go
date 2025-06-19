@@ -6,6 +6,7 @@ import (
 	"net/url"
 
 	internalDomain "github.com/riskibarqy/Snax-be/url-shortener/internal/domain"
+	"github.com/riskibarqy/Snax-be/url-shortener/internal/utils"
 )
 
 // Handler contains all the dependencies for HTTP handlers
@@ -37,36 +38,35 @@ func (h *Handler) HandlePublicShorten(w http.ResponseWriter, r *http.Request) {
 		URL string `json:"url"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	// Decode and validate body
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.URL == "" {
+		msg := "Invalid request body"
+		if req.URL == "" {
+			msg = "URL is required"
+		}
+		utils.RespondError(w, http.StatusBadRequest, msg, err)
 		return
 	}
 
-	if req.URL == "" {
-		http.Error(w, "URL is required", http.StatusBadRequest)
-		return
-	}
-
-	// Validate URL
+	// Validate URL format
 	if _, err := url.ParseRequestURI(req.URL); err != nil {
-		http.Error(w, "Invalid URL format", http.StatusBadRequest)
+		utils.RespondError(w, http.StatusBadRequest, "Invalid URL format", err)
 		return
 	}
 
-	// Create short URL without user association
+	// Try creating the short URL
 	shortURL, err := h.urlService.CreateShortURL(r.Context(), req.URL, "", nil)
-
 	if err != nil {
-		http.Error(w, "Failed to create short URL", http.StatusInternalServerError)
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to create short URL", err)
 		return
 	}
 
-	response := struct {
-		ShortURL string `json:"shortUrl"`
-	}{
-		ShortURL: shortURL.ShortCode,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	// Success
+	utils.JSONResponse(utils.JSONOpts{
+		W:      w,
+		Status: http.StatusOK,
+		Data: map[string]any{
+			"shortUrl": shortURL.ShortCode,
+		},
+	})
 }

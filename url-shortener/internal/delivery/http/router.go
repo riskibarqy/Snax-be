@@ -15,7 +15,7 @@ func SetupRouter(h *Handler, authMiddleware *customMiddleware.AuthMiddleware) *c
 
 	// CORS middleware - configure it properly!
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"https://snax-owabli7ds-riskis-projects-f9d83e4a.vercel.app"}, // your frontend origin
+		AllowedOrigins:   []string{"*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		AllowCredentials: true,
