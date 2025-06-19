@@ -66,7 +66,7 @@ func (h *Handler) HandlePublicShorten(w http.ResponseWriter, r *http.Request) {
 		W:      w,
 		Status: http.StatusOK,
 		Data: map[string]any{
-			"shortUrl": shortURL.ShortCode,
+			"shortCode": shortURL.ShortCode,
 		},
 	})
 }
