@@ -12,6 +12,15 @@ import (
 func SetupRouter(h *Handler, authMiddleware *customMiddleware.AuthMiddleware) *chi.Mux {
 	r := chi.NewRouter()
 
+	// CORS middleware - configure it properly!
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"https://snax-owabli7ds-riskis-projects-f9d83e4a.vercel.app"}, // your frontend origin
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		AllowCredentials: true,
+		MaxAge:           300, // Cache preflight for 5 minutes
+	}))
+
 	// Global middleware
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
